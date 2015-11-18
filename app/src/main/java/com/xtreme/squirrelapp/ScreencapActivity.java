@@ -15,6 +15,7 @@ import android.os.Environment;
 import android.os.SystemClock;
 import android.support.v7.app.AppCompatActivity;
 import android.util.DisplayMetrics;
+import android.util.Log;
 import android.view.Surface;
 import android.view.View;
 import android.view.WindowManager;
@@ -26,6 +27,7 @@ import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
+
 
 public class ScreencapActivity extends AppCompatActivity {
 
@@ -40,7 +42,7 @@ public class ScreencapActivity extends AppCompatActivity {
     private String outputFile;
 
     private final DateFormat fileFormat =
-            new SimpleDateFormat("'Screencap_'yyyy-MM-dd-HH-mm-ss'.mp4'", Locale.US);
+            new SimpleDateFormat("'Screencap_'yyyy-MM-dd-HH-mm-ss'.mp4'", Locale.CANADA);
     String outputName = fileFormat.format(new Date());
 
 
@@ -51,8 +53,10 @@ public class ScreencapActivity extends AppCompatActivity {
         context = getApplicationContext();
         recordButton = (Button) findViewById(R.id.button_record);
         projectionManager = (MediaProjectionManager) context.getSystemService(MEDIA_PROJECTION_SERVICE);
-        File picturesDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES);
+        //File picturesDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES);
+        File picturesDir = context.getExternalFilesDir(Environment.DIRECTORY_MOVIES);
         outputRoot = new File(picturesDir, "screencap");
+
 
         View.OnClickListener clickListener = new View.OnClickListener() {
             @Override
@@ -70,10 +74,10 @@ public class ScreencapActivity extends AppCompatActivity {
 
     private void stopRecording() {
         projection.stop();
-        recorder.reset();
+        recorder.stop();
+
         recorder.release();
         display.release();
-        recorder.stop();
     }
 
     private void startRecording() {
@@ -102,9 +106,13 @@ public class ScreencapActivity extends AppCompatActivity {
             recorder = new MediaRecorder();
             RecordingInfo recordingInfo = getRecordingInfo();
 
-            outputFile = new File(outputRoot, outputName).getAbsolutePath();
 
-            outputRoot.mkdir();
+            if (!outputRoot.mkdirs()) {
+                Log.v("blah","Unable to create output directory="+ outputRoot.getAbsolutePath());
+                // We're probably about to crash, but at least the log will indicate as to why.
+            }
+
+
 
             recorder.setVideoSource(MediaRecorder.VideoSource.SURFACE);
             recorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4);
@@ -112,12 +120,24 @@ public class ScreencapActivity extends AppCompatActivity {
             recorder.setVideoEncoder(MediaRecorder.VideoEncoder.H264);
             recorder.setVideoSize(recordingInfo.width, recordingInfo.height);
             recorder.setVideoEncodingBitRate(8 * 1000 * 1000);
+            outputFile = new File(outputRoot, outputName).getAbsolutePath();
+
+            String outputName = fileFormat.format(new Date());
+            outputFile = new File(outputRoot, outputName).getAbsolutePath();
             recorder.setOutputFile(outputFile);
+
+            Log.v("blah", "absolute path is=" + outputFile.toString());
+
             try {
                 recorder.prepare();
-            } catch (IOException e) {
+            } catch (IllegalStateException e) {
                 e.printStackTrace();
+                Log.v("blah","illegal state exception");
+            } catch (IOException e){
+                e.printStackTrace();
+                Log.v("blah", "io exception");
             }
+
             projection = projectionManager.getMediaProjection(Activity.RESULT_OK, params[0]);
             Surface surface = recorder.getSurface();
             display =
